@@ -5,9 +5,15 @@ import { isBackgroundImage, isPlayerWithVision, isVisionFog }  from './itemFilte
 import { setupContextMenus, createActions, createMode, createTool, onSceneDataChange } from './visionTool';
 
 // Create the extension page
+
 const app = document.querySelector('#app');
 app.style.textAlign = "left";
 app.parentElement.style.placeItems = "start";
+
+// set dummy defaultRange. This is the default if no metadata is found.
+// used below in the innerHTML, so it has to be defined early.
+var defaultRange = 5;
+
 app.innerHTML = `
   <div>
     <div>
@@ -18,7 +24,7 @@ app.innerHTML = `
       <p style="overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width:16em">Map: <span id="map_name">No map selected</span></p>
       <p><span id="map_size">Please set your map as a background</span></p>
       <hr>
-      <h2 style="margin-bottom: 0;">Vision Radius</h2>
+      <h2 style="margin-bottom: 0;">Vision Radius&nbsp;&nbsp;</h2><input class="token-vision-range" id="default-range" type="number" value="${defaultRange}">
       <p id="no_tokens_message">Enable vision on your character tokens</p>
       <div id="token_list_div" style="display: block;">
         <table style="margin: auto; padding: 0;"><tbody id="token_list">
@@ -37,6 +43,8 @@ app.innerHTML = `
     </div>
   </div>
 `
+
+
 async function setButtonHandler() {
   const visionCheckbox = document.getElementById("vision_checkbox");
 
@@ -50,15 +58,41 @@ async function setButtonHandler() {
   }, false);
 }
 
+// Function to handle changing the default view distance. 
+// immediatly sets the defaultRange var and updates the metadata.
+
+async function setDefaultRange() {
+  const dRange = document.getElementById("default-range");
+  dRange.addEventListener("change", async event=> {
+    console.log("Boop");
+    const value = parseInt(event.target.value);
+        if (value < 1)
+          event.target.value = 1;
+        if (value > 999)
+          event.target.value = 999;
+    
+    defaultRange = value;
+    await OBR.scene.setMetadata({[`${ID}/visionDefRange`]: defaultRange});
+ }, false);
+}
+
+
+
+
 function updateUI(items)
 {
   const table = document.getElementById("token_list");
   const message = document.getElementById("no_tokens_message");
   const visionCheckbox = document.getElementById("vision_checkbox");
   const playersWithVision = items.filter(isPlayerWithVision);
-
-  if (sceneCache.metadata)
+  
+  if (sceneCache.metadata) {
     visionCheckbox.checked = sceneCache.metadata[`${ID}/visionEnabled`] == true;
+  // load defaultRange metadata and update the default view distance widget.
+    defaultRange = sceneCache.metadata[`${ID}/visionDefRange`];
+    var defRangeBox = document.getElementById("default-range");
+    defRangeBox.value = defaultRange;
+  }
 
   if (playersWithVision.length > 0)
     message.style.display = "none";
@@ -77,6 +111,19 @@ function updateUI(items)
 
   for (const player of playersWithVision) {
     const tr = document.getElementById(`tr-${player.id}`);
+
+    if (typeof defaultRange === "undefined") {
+      defaultRange = 1;
+      OBR.scene.setMetadata({[`${ID}/visionDefRange`]: defaultRange});
+      var defRangeBox = document.getElementById("default-range");
+      defRangeBox.value = defaultRange;
+
+    };
+
+    // curRange is the view range for existing players. Set to default if missing.
+    const curRange =  player.metadata[`${ID}/visionRange`] ? player.metadata[`${ID}/visionRange`] : defaultRange;
+   
+    
     if (tr) {
       // Update with current information
       const name = tr.getElementsByClassName("token-name")[0]
@@ -86,7 +133,7 @@ function updateUI(items)
         name.innerText = player.name;
       if (rangeInput) {
         if (!unlimitedCheckbox.checked)
-          rangeInput.value = player.metadata[`${ID}/visionRange`] ? player.metadata[`${ID}/visionRange`] : 60;
+          rangeInput.value = player.metadata[`${ID}/visionRange`] ? player.metadata[`${ID}/visionRange`] : defaultRange;
       }
       if (unlimitedCheckbox) {
         unlimitedCheckbox.checked = !player.metadata[`${ID}/visionRange`];
@@ -101,12 +148,19 @@ function updateUI(items)
       const newTr = document.createElement("tr");
       newTr.id = `tr-${player.id}`;
       newTr.className = "token-table-entry";
-      newTr.innerHTML = `<td class="token-name">${player.name}</td><td><input class="token-vision-range" type="number" value="60"><span class="unit">ft</span></td><td>&nbsp;&nbsp;&infin;&nbsp<input type="checkbox" class="unlimited-vision"></td>`;
+      // Per player setting interface
+      newTr.innerHTML = `<td class="token-name">${player.name}</td><td><input class="token-vision-range" name="player-range" type="number" value="${curRange}"><span class="unit"></span></td><td>&nbsp;&nbsp;&infin;&nbsp<input type="checkbox" class="unlimited-vision"></td>`;
       table.appendChild(newTr);
       
       // Register event listeners
       const rangeInput = newTr.getElementsByClassName("token-vision-range")[0];
       const unlimitedCheckbox = newTr.getElementsByClassName("unlimited-vision")[0];
+     
+      // force update of vision metadata
+      OBR.scene.items.updateItems([player], items => {
+          items[0].metadata[`${ID}/visionRange`] = rangeInput.value;
+        });
+
       rangeInput.addEventListener("change", async event => {
         const value = parseInt(event.target.value);
         if (value < 0)
@@ -117,18 +171,22 @@ function updateUI(items)
           items[0].metadata[`${ID}/visionRange`] = parseInt(value);
         });
       }, false);
+
+      // Hack to temp disable the unlimited checkboxes. Too easy to turn on
+      // and the logic is a bit dodgy.
+      
       unlimitedCheckbox.addEventListener("click", async event => {
-        let value = false;
-        if (event.target.checked)
-          rangeInput.setAttribute("disabled", "disabled");
-        else {
-          value = parseInt(rangeInput.value);
-          rangeInput.removeAttribute("disabled");
-        }
-        await OBR.scene.items.updateItems([player], items => {
-          items[0].metadata[`${ID}/visionRange`] = parseInt(value);
+//        let value = false;
+//        if (event.target.checked)
+//          rangeInput.setAttribute("disabled", "disabled");
+//        else {
+//          value = parseInt(rangeInput.value);
+//          rangeInput.removeAttribute("disabled");
+//        }
+//        await OBR.scene.items.updateItems([player], items => {
+//          items[0].metadata[`${ID}/visionRange`] = parseInt(value);
         });
-      }, false);
+//      }, false);
     }
   }
 }
@@ -145,7 +203,6 @@ async function initScene(playerOrGM)
     OBR.scene.fog.getColor()
   ]);
   OBR.scene.items.deleteItems(sceneCache.items.filter(isVisionFog));
-
   sceneCache.gridScale = sceneCache.gridScale.parsed.multiplier;
   sceneCache.fog = {filled: fogFilled, style: {color: fogColor, strokeWidth: 5}};
 
@@ -175,6 +232,7 @@ OBR.onReady(() => {
     // local fog paths.
     if (value == "GM") {
       setButtonHandler();
+      setDefaultRange();
       setupContextMenus();
       createTool();
       createMode();
