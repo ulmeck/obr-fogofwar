@@ -10,9 +10,8 @@ const app = document.querySelector('#app');
 app.style.textAlign = "left";
 app.parentElement.style.placeItems = "start";
 
-// set dummy defaultRange. This is the default if no metadata is found.
-// used below in the innerHTML, so it has to be defined early.
-var defaultRange = 5;
+// Global for the default player range
+console.log("Boop.init");
 
 app.innerHTML = `
   <div>
@@ -24,7 +23,7 @@ app.innerHTML = `
       <p style="overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width:16em">Map: <span id="map_name">No map selected</span></p>
       <p><span id="map_size">Please set your map as a background</span></p>
       <hr>
-      <h2 style="margin-bottom: 0;">Vision Radius&nbsp;&nbsp;</h2><input class="token-vision-range" id="default-range" type="number" value="${defaultRange}">
+      <h2 style="margin-bottom: 0;">Vision Radius&nbsp;&nbsp;</h2><input class="token-vision-range" id="default-range" type="number" value="0">
       <p id="no_tokens_message">Enable vision on your character tokens</p>
       <div id="token_list_div" style="display: block;">
         <table style="margin: auto; padding: 0;"><tbody id="token_list">
@@ -64,16 +63,20 @@ async function setButtonHandler() {
 async function setDefaultRange() {
   const dRange = document.getElementById("default-range");
   dRange.addEventListener("change", async event=> {
-    console.log("Boop");
     const value = parseInt(event.target.value);
+	if (!value)
+	  event.target.value = 1;
         if (value < 1)
           event.target.value = 1;
         if (value > 999)
           event.target.value = 999;
     
-    defaultRange = value;
-    await OBR.scene.setMetadata({[`${ID}/visionDefRange`]: defaultRange});
+     event.target.value; 
+    console.log("Boop.setDefaultRange:" + event.target.value);
+
+    await OBR.scene.setMetadata({[`${ID}/visionDefRange`]: event.target.value});
  }, false);
+
 }
 
 
@@ -85,15 +88,25 @@ function updateUI(items)
   const message = document.getElementById("no_tokens_message");
   const visionCheckbox = document.getElementById("vision_checkbox");
   const playersWithVision = items.filter(isPlayerWithVision);
-  
+
   if (sceneCache.metadata) {
+    var defaultRange = sceneCache.metadata[`${ID}/visionDefRange`];
+    if (typeof defaultRange == "undefined") defaultRange = document.getElementById("default-range").value;
+    console.log("Boop.sceneCachemetadata:" + defaultRange);
     visionCheckbox.checked = sceneCache.metadata[`${ID}/visionEnabled`] == true;
+    if (typeof sceneCache.metadata[`${ID}/visionDefRange`] == "undefined") {
+	  OBR.scene.setMetadata({[`${ID}/visionDefRange`]: defaultRange });
+          console.log("UpdateDefRange:" + defaultRange);
+    }
+
   // load defaultRange metadata and update the default view distance widget.
-    defaultRange = sceneCache.metadata[`${ID}/visionDefRange`];
+//    defaultRange = sceneCache.metadata[`${ID}/visionDefRange`];
     var defRangeBox = document.getElementById("default-range");
     defRangeBox.value = defaultRange;
+     console.log("AftersceneCache:" + defaultRange);
   }
 
+  console.log("Boop.updateUI" + defaultRange);
   if (playersWithVision.length > 0)
     message.style.display = "none";
   else
@@ -112,17 +125,8 @@ function updateUI(items)
   for (const player of playersWithVision) {
     const tr = document.getElementById(`tr-${player.id}`);
 
-    if (typeof defaultRange === "undefined") {
-      defaultRange = 1;
-      OBR.scene.setMetadata({[`${ID}/visionDefRange`]: defaultRange});
-      var defRangeBox = document.getElementById("default-range");
-      defRangeBox.value = defaultRange;
-
-    };
-
     // curRange is the view range for existing players. Set to default if missing.
     const curRange =  player.metadata[`${ID}/visionRange`] ? player.metadata[`${ID}/visionRange`] : defaultRange;
-   
     
     if (tr) {
       // Update with current information
@@ -149,7 +153,7 @@ function updateUI(items)
       newTr.id = `tr-${player.id}`;
       newTr.className = "token-table-entry";
       // Per player setting interface
-      newTr.innerHTML = `<td class="token-name">${player.name}</td><td><input class="token-vision-range" name="player-range" type="number" value="${curRange}"><span class="unit"></span></td><td>&nbsp;&nbsp;&infin;&nbsp<input type="checkbox" class="unlimited-vision"></td>`;
+      newTr.innerHTML = `<td class="token-name">${player.name}</td><td><input class="token-vision-range" id="player-range" type="number" value="${curRange}"><span class="unit"></span></td><td>&nbsp;&nbsp;&infin;&nbsp<input type="checkbox" class="unlimited-vision"></td>`;
       table.appendChild(newTr);
       
       // Register event listeners
@@ -169,6 +173,8 @@ function updateUI(items)
           event.target.value = 999;
         await OBR.scene.items.updateItems([player], items => {
           items[0].metadata[`${ID}/visionRange`] = parseInt(value);
+	  var defRangeBox = document.getElementById("player-range");
+          defRangeBox.value = curRange;
         });
       }, false);
 
