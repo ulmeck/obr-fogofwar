@@ -1,5 +1,12 @@
 const ID = "com.armindoflores.fogofwar";
 
+class RoomCash {
+    constructor() {
+        this.metadata = undefined;
+        this.ready = false;
+    }
+};
+
 class SceneCash {
     constructor() {
         this.items = undefined; 
@@ -13,3 +20,4 @@ class SceneCash {
 
 export { ID };
 export const sceneCache = new SceneCash();
+export const roomCache = new RoomCash();

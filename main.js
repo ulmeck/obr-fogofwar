@@ -1,6 +1,6 @@
 import "./style.css";
 import OBR from "@owlbear-rodeo/sdk";
-import { ID, sceneCache } from './globals';
+import { ID, sceneCache, roomCache } from './globals';
 import { isBackgroundImage, isPlayerWithVision, isVisionFog }  from './itemFilters';
 import { setupContextMenus, createActions, createMode, createTool, onSceneDataChange } from './visionTool';
 
@@ -70,11 +70,10 @@ async function setDefaultRange() {
           event.target.value = 1;
         if (value > 999)
           event.target.value = 999;
-    
-     event.target.value; 
+     
     console.log("Boop.setDefaultRange:" + event.target.value);
-
-    await OBR.scene.setMetadata({[`${ID}/visionDefRange`]: event.target.value});
+    roomCache.metadata[`${ID}/visionDefRange`] = event.target.value;
+    await OBR.room.setMetadata({[`${ID}/visionDefRange`]: event.target.value});
  }, false);
 
 }
@@ -89,24 +88,37 @@ function updateUI(items)
   const visionCheckbox = document.getElementById("vision_checkbox");
   const playersWithVision = items.filter(isPlayerWithVision);
 
-  if (sceneCache.metadata) {
-    var defaultRange = sceneCache.metadata[`${ID}/visionDefRange`];
-    if (typeof defaultRange == "undefined") defaultRange = document.getElementById("default-range").value;
-    console.log("Boop.sceneCachemetadata:" + defaultRange);
+  if (sceneCache.metadata) 
     visionCheckbox.checked = sceneCache.metadata[`${ID}/visionEnabled`] == true;
-    if (typeof sceneCache.metadata[`${ID}/visionDefRange`] == "undefined") {
-	  OBR.scene.setMetadata({[`${ID}/visionDefRange`]: defaultRange });
-          console.log("UpdateDefRange:" + defaultRange);
+    
+// default vision is now held in the room metadata. Seems more stable 
+// than per scene.
+// If room metadata is available
+  if (roomCache.metadata) {
+// set the default range out of the metdata cache
+    var defaultRange = roomCache.metadata[`${ID}/visionDefRange`];
+// if its never been set for this room, initalize it with the contents
+// of the html form and write it to the metadata.
+    if (typeof defaultRange == "undefined") { 
+      defaultRange = document.getElementById("default-range").value;	  
+      OBR.scene.setMetadata({[`${ID}/visionDefRange`]: defaultRange });
+      console.log("Boop.OnlyOnce:" + defaultRange);
     }
+    console.log("Boo.AfterDefaultRangeset" + defaultRange);
+  
 
-  // load defaultRange metadata and update the default view distance widget.
-//    defaultRange = sceneCache.metadata[`${ID}/visionDefRange`];
+
+// update the default form box with the current default range, 
+// just to make sure we're all on the same page.
     var defRangeBox = document.getElementById("default-range");
     defRangeBox.value = defaultRange;
-     console.log("AftersceneCache:" + defaultRange);
+    console.log("AfterroomCache:" + defaultRange);
   }
 
   console.log("Boop.updateUI" + defaultRange);
+
+
+
   if (playersWithVision.length > 0)
     message.style.display = "none";
   else
@@ -125,7 +137,7 @@ function updateUI(items)
   for (const player of playersWithVision) {
     const tr = document.getElementById(`tr-${player.id}`);
 
-    // curRange is the view range for existing players. Set to default if missing.
+    // curRange is the view range for existing players. Set to default if undef.
     const curRange =  player.metadata[`${ID}/visionRange`] ? player.metadata[`${ID}/visionRange`] : defaultRange;
     
     if (tr) {
@@ -167,14 +179,14 @@ function updateUI(items)
 
       rangeInput.addEventListener("change", async event => {
         const value = parseInt(event.target.value);
-        if (value < 0)
-          event.target.value = 0;
+	if (typeof value == "undefined") 
+	  event.target.value = 1;
+        if (value < 1)
+          event.target.value = 1;
         if (value > 999)
           event.target.value = 999;
         await OBR.scene.items.updateItems([player], items => {
-          items[0].metadata[`${ID}/visionRange`] = parseInt(value);
-	  var defRangeBox = document.getElementById("player-range");
-          defRangeBox.value = curRange;
+          items[0].metadata[`${ID}/visionRange`] = parseInt(event.target.value);
         });
       }, false);
 
@@ -200,9 +212,10 @@ function updateUI(items)
 async function initScene(playerOrGM) 
 {
   let fogFilled, fogColor;
-  [sceneCache.items, sceneCache.metadata, sceneCache.gridDpi, sceneCache.gridScale, fogFilled, fogColor] = await Promise.all([
+  [sceneCache.items, sceneCache.metadata, roomCache.metadata, sceneCache.gridDpi, sceneCache.gridScale, fogFilled, fogColor] = await Promise.all([
     OBR.scene.items.getItems(),
     OBR.scene.getMetadata(),
+    OBR.room.getMetadata(),
     OBR.scene.grid.getDpi(),
     OBR.scene.grid.getScale(),
     OBR.scene.fog.getFilled(),
