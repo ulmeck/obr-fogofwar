@@ -4,10 +4,6 @@ import { ID, sceneCache, roomCache } from './globals';
 import { isBackgroundImage, isPlayerWithVision, isVisionFog }  from './itemFilters';
 import { setupContextMenus, createActions, createMode, createTool, onSceneDataChange } from './visionTool';
 
-// Debugging hack
-const badDebug = true;
-
-
 // Create the extension page
 
 const app = document.querySelector('#app');
@@ -15,7 +11,7 @@ app.style.textAlign = "left";
 app.parentElement.style.placeItems = "start";
 
 // Global for the default player range
-if (badDebug) console.log("Boop.init!");
+console.log("Boop.init");
 
 app.innerHTML = `
   <div>
@@ -75,7 +71,7 @@ async function setDefaultRange() {
         if (value > 999)
           event.target.value = 999;
      
-    if (badDebug) console.log("Boop.setDefaultRange:" + event.target.value);
+    console.log("Boop.setDefaultRange:" + event.target.value);
     roomCache.metadata[`${ID}/visionDefRange`] = event.target.value;
     await OBR.room.setMetadata({[`${ID}/visionDefRange`]: event.target.value});
  }, false);
@@ -106,9 +102,9 @@ function updateUI(items)
     if (typeof defaultRange == "undefined") { 
       defaultRange = document.getElementById("default-range").value;	  
       OBR.scene.setMetadata({[`${ID}/visionDefRange`]: defaultRange });
-      if (badDebug) console.log("Boop.OnlyOnce:" + defaultRange);
+      console.log("Boop.OnlyOnce:" + defaultRange);
     }
-    if (badDebug) console.log("Boop.AfterDefaultRangeset:" + defaultRange);
+    console.log("Boo.AfterDefaultRangeset" + defaultRange);
   
 
 
@@ -116,10 +112,10 @@ function updateUI(items)
 // just to make sure we're all on the same page.
     var defRangeBox = document.getElementById("default-range");
     defRangeBox.value = defaultRange;
-    if (badDebug) console.log("AfterroomCache:" + defaultRange);
+    console.log("AfterroomCache:" + defaultRange);
   }
 
-  if (badDebug) console.log("Boop.updateUI:" + defaultRange);
+  console.log("Boop.updateUI" + defaultRange);
 
 
 
@@ -148,8 +144,20 @@ function updateUI(items)
       // Update with current information
       const name = tr.getElementsByClassName("token-name")[0]
       const rangeInput = tr.getElementsByClassName("token-vision-range")[0];
+      const unlimitedCheckbox = tr.getElementsByClassName("unlimited-vision")[0];
       if (name)
         name.innerText = player.name;
+      if (rangeInput) {
+        if (!unlimitedCheckbox.checked)
+          rangeInput.value = player.metadata[`${ID}/visionRange`] ? player.metadata[`${ID}/visionRange`] : defaultRange;
+      }
+      if (unlimitedCheckbox) {
+        unlimitedCheckbox.checked = !player.metadata[`${ID}/visionRange`];
+      }
+      if (unlimitedCheckbox.checked)
+        rangeInput.setAttribute("disabled", "disabled");
+      else
+        rangeInput.removeAttribute("disabled");
     }
     else {
       // Create new item for this token
@@ -157,7 +165,7 @@ function updateUI(items)
       newTr.id = `tr-${player.id}`;
       newTr.className = "token-table-entry";
       // Per player setting interface
-      newTr.innerHTML = `<td class="token-name">${player.name}</td><td><input class="token-vision-range" id="player-range" type="number" value="${curRange}"><span class="unit"></span></td>`;
+      newTr.innerHTML = `<td class="token-name">${player.name}</td><td><input class="token-vision-range" id="player-range" type="number" value="${curRange}"><span class="unit"></span></td><td>&nbsp;&nbsp;&infin;&nbsp<input type="checkbox" class="unlimited-vision"></td>`;
       table.appendChild(newTr);
       
       // Register event listeners
@@ -171,18 +179,32 @@ function updateUI(items)
 
       rangeInput.addEventListener("change", async event => {
         const value = parseInt(event.target.value);
-	if (isNaN(value))
-           event.target.value = 1;
+	if (typeof value == "undefined") 
+	  event.target.value = 1;
         if (value < 1)
-           event.target.value = 1;
+          event.target.value = 1;
         if (value > 999)
-           event.target.value = 999;
-	if (badDebug) console.log("value:" + value + ":" + event.target.value);
+          event.target.value = 999;
         await OBR.scene.items.updateItems([player], items => {
           items[0].metadata[`${ID}/visionRange`] = parseInt(event.target.value);
         });
       }, false);
 
+      // Hack to temp disable the unlimited checkboxes. Too easy to turn on
+      // and the logic is a bit dodgy.
+      
+      unlimitedCheckbox.addEventListener("click", async event => {
+//        let value = false;
+//        if (event.target.checked)
+//          rangeInput.setAttribute("disabled", "disabled");
+//        else {
+//          value = parseInt(rangeInput.value);
+//          rangeInput.removeAttribute("disabled");
+//        }
+//        await OBR.scene.items.updateItems([player], items => {
+//          items[0].metadata[`${ID}/visionRange`] = parseInt(value);
+        });
+//      }, false);
     }
   }
 }
