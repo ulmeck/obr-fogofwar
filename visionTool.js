@@ -20,17 +20,29 @@ export function setupContextMenus() {
         label: "Enable Vision",
         filter: {
           every: [{ key: "layer", value: "CHARACTER" }, { key: ["metadata", `${ID}/hasVision`], value: undefined}],
-	  every: [{ key: "layer", value: "PROP" }, { key: ["metadata", `${ID}/hasVision`], value: undefined}],
+        },
+      },
+      {
+        icon: "/no-vision.svg",
+        label: "Enable Vision",
+        filter: {
+          every: [{ key: "layer", value: "PROP" }, { key: ["metadata", `${ID}/hasVision`], value: undefined}],
         },
       },
       {
         icon: "/icon.svg",
         label: "Disable Vision",
         filter: {
-          every: [{ key: "layer", value: "CHARACTER" }],
-	  every: [{ key: "layer", value: "PROP" }],
+	  every: [{ key: "layer", value: "CHARACTER" }],
         },
       },
+      {
+        icon: "/icon.svg",
+        label: "Disable Vision",
+        filter: {
+          every: [{ key: "layer", value: "PROP" }],
+        },
+     }
     ],
     async onClick(ctx) {
       OBR.scene.items.updateItems(ctx.items, items => {
