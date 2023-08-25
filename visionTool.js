@@ -20,6 +20,7 @@ export function setupContextMenus() {
         label: "Enable Vision",
         filter: {
           every: [{ key: "layer", value: "CHARACTER" }, { key: ["metadata", `${ID}/hasVision`], value: undefined}],
+	  every: [{ key: "layer", value: "PROP" }, { key: ["metadata", `${ID}/hasVision`], value: undefined}],
         },
       },
       {
@@ -27,16 +28,17 @@ export function setupContextMenus() {
         label: "Disable Vision",
         filter: {
           every: [{ key: "layer", value: "CHARACTER" }],
+	  every: [{ key: "layer", value: "PROP" }],
         },
       },
     ],
     async onClick(ctx) {
       OBR.scene.items.updateItems(ctx.items, items => {
         for (const item of items) {
-          if (item.metadata[`${ID}/hasVision`] && item.layer == "CHARACTER") {
+          if (item.metadata[`${ID}/hasVision`] && (item.layer == "CHARACTER" || item.layer == "PROP")) {
             delete item.metadata[`${ID}/hasVision`];
           }
-          else if (item.layer == "CHARACTER"){
+          else if (item.layer == "CHARACTER" || item.layer == "PROP"){
             item.metadata[`${ID}/hasVision`] = true;
           }
         }

@@ -68,14 +68,15 @@ async function setDefaultRange() {
   const dRange = document.getElementById("default-range");
   dRange.addEventListener("change", async event=> {
     const value = parseInt(event.target.value);
-	if (!value)
-	  event.target.value = 1;
+	if (isNaN(value))
+           event.target.value = 1;
         if (value < 1)
           event.target.value = 1;
         if (value > 999)
           event.target.value = 999;
      
     if (badDebug) console.log("Boop.setDefaultRange:" + event.target.value);
+// write new value to local cache and update metadata
     roomCache.metadata[`${ID}/visionDefRange`] = event.target.value;
     await OBR.room.setMetadata({[`${ID}/visionDefRange`]: event.target.value});
  }, false);
